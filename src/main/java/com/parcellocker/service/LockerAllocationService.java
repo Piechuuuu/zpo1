@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -17,16 +18,19 @@ public class LockerAllocationService {
 
     /**
      * Finds the smallest available locker that fits the given parcel dimensions.
-     * Dimensions are sorted descending to match against locker max dimensions
-     * (width >= height >= depth) for optimal fitting.
+     * Tries fitting sizes from smallest to largest — if all lockers of the smallest
+     * fitting size are occupied, cascades to the next larger size.
      *
      * Fully functional: uses streams, predicates from enum, no explicit loops.
      */
     public Optional<Locker> allocateLocker(int width, int height, int depth) {
         int[] sorted = sortDimensions(width, height, depth);
 
-        return findSmallestFittingSize(sorted)
-                .flatMap(lockerRepository::findFirstByLockerSizeAndOccupiedFalse);
+        return findAllFittingSizes(sorted)
+                .map(lockerRepository::findFirstByLockerSizeAndOccupiedFalse)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
     }
 
     /**
@@ -40,12 +44,11 @@ public class LockerAllocationService {
     }
 
     /**
-     * Finds the smallest LockerSize whose max dimensions fit the sorted parcel dims.
-     * Uses LockerSize.sortedByVolume() stream and fitsPredicate() — no ifs.
+     * Returns all LockerSizes that fit the parcel, sorted smallest to largest.
+     * Used to cascade: if smallest fitting size has no free lockers, try next.
      */
-    public Optional<LockerSize> findSmallestFittingSize(int[] sortedDimensions) {
+    public Stream<LockerSize> findAllFittingSizes(int[] sortedDimensions) {
         return LockerSize.sortedByVolume()
-                .filter(size -> size.fitsPredicate().test(sortedDimensions))
-                .findFirst();
+                .filter(size -> size.fitsPredicate().test(sortedDimensions));
     }
 }

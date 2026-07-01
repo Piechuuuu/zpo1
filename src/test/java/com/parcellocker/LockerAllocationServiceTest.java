@@ -11,7 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -91,8 +93,53 @@ class LockerAllocationServiceTest {
     }
 
     @Test
-    void shouldReturnEmptyWhenNoSmallLockerAvailable() {
+    void shouldCascadeToMediumWhenAllSmallOccupied() {
         when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.SMALL))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.MEDIUM))
+                .thenReturn(Optional.of(mediumLocker));
+
+        Optional<Locker> result = allocationService.allocateLocker(10, 8, 5);
+
+        assertTrue(result.isPresent());
+        assertEquals(LockerSize.MEDIUM, result.get().getLockerSize());
+    }
+
+    @Test
+    void shouldCascadeToLargeWhenAllSmallAndMediumOccupied() {
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.SMALL))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.MEDIUM))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.LARGE))
+                .thenReturn(Optional.of(largeLocker));
+
+        Optional<Locker> result = allocationService.allocateLocker(10, 8, 5);
+
+        assertTrue(result.isPresent());
+        assertEquals(LockerSize.LARGE, result.get().getLockerSize());
+    }
+
+    @Test
+    void shouldCascadeToLargeWhenAllMediumOccupied() {
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.MEDIUM))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.LARGE))
+                .thenReturn(Optional.of(largeLocker));
+
+        Optional<Locker> result = allocationService.allocateLocker(25, 20, 15);
+
+        assertTrue(result.isPresent());
+        assertEquals(LockerSize.LARGE, result.get().getLockerSize());
+    }
+
+    @Test
+    void shouldReturnEmptyWhenAllLockersOccupied() {
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.SMALL))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.MEDIUM))
+                .thenReturn(Optional.empty());
+        when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.LARGE))
                 .thenReturn(Optional.empty());
 
         Optional<Locker> result = allocationService.allocateLocker(10, 8, 5);
@@ -112,7 +159,6 @@ class LockerAllocationServiceTest {
         when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.SMALL))
                 .thenReturn(Optional.of(smallLocker));
 
-        // 10x15x20 should fit SMALL (after sorting: 20x15x10)
         Optional<Locker> result = allocationService.allocateLocker(10, 15, 20);
 
         assertTrue(result.isPresent());
@@ -124,7 +170,6 @@ class LockerAllocationServiceTest {
         when(lockerRepository.findFirstByLockerSizeAndOccupiedFalse(LockerSize.MEDIUM))
                 .thenReturn(Optional.of(mediumLocker));
 
-        // 21 exceeds SMALL max width of 20
         Optional<Locker> result = allocationService.allocateLocker(21, 10, 5);
 
         assertTrue(result.isPresent());
@@ -132,34 +177,41 @@ class LockerAllocationServiceTest {
     }
 
     @Test
-    void shouldFindSmallestFittingSizeForSmallDims() {
-        Optional<LockerSize> size = allocationService.findSmallestFittingSize(new int[]{15, 10, 8});
+    void shouldFindAllFittingSizesForSmallDims() {
+        List<LockerSize> sizes = allocationService.findAllFittingSizes(new int[]{15, 10, 8})
+                .collect(Collectors.toList());
 
-        assertTrue(size.isPresent());
-        assertEquals(LockerSize.SMALL, size.get());
+        assertEquals(3, sizes.size());
+        assertEquals(LockerSize.SMALL, sizes.get(0));
+        assertEquals(LockerSize.MEDIUM, sizes.get(1));
+        assertEquals(LockerSize.LARGE, sizes.get(2));
     }
 
     @Test
-    void shouldFindSmallestFittingSizeForMediumDims() {
-        Optional<LockerSize> size = allocationService.findSmallestFittingSize(new int[]{30, 25, 15});
+    void shouldFindAllFittingSizesForMediumDims() {
+        List<LockerSize> sizes = allocationService.findAllFittingSizes(new int[]{30, 25, 15})
+                .collect(Collectors.toList());
 
-        assertTrue(size.isPresent());
-        assertEquals(LockerSize.MEDIUM, size.get());
+        assertEquals(2, sizes.size());
+        assertEquals(LockerSize.MEDIUM, sizes.get(0));
+        assertEquals(LockerSize.LARGE, sizes.get(1));
     }
 
     @Test
-    void shouldFindSmallestFittingSizeForLargeDims() {
-        Optional<LockerSize> size = allocationService.findSmallestFittingSize(new int[]{55, 40, 30});
+    void shouldFindAllFittingSizesForLargeDims() {
+        List<LockerSize> sizes = allocationService.findAllFittingSizes(new int[]{55, 40, 30})
+                .collect(Collectors.toList());
 
-        assertTrue(size.isPresent());
-        assertEquals(LockerSize.LARGE, size.get());
+        assertEquals(1, sizes.size());
+        assertEquals(LockerSize.LARGE, sizes.get(0));
     }
 
     @Test
     void shouldReturnEmptyForOversizedDims() {
-        Optional<LockerSize> size = allocationService.findSmallestFittingSize(new int[]{100, 100, 100});
+        List<LockerSize> sizes = allocationService.findAllFittingSizes(new int[]{100, 100, 100})
+                .collect(Collectors.toList());
 
-        assertTrue(size.isEmpty());
+        assertTrue(sizes.isEmpty());
     }
 
     @Test
