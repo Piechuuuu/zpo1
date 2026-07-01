@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Paczkomatow</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 30px; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .user-info { background: #fff; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn { background: #3498db; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 1em; }
+        .btn:hover { background: #2980b9; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #219a52; }
+        .btn-warning { background: #f39c12; }
+        .btn-warning:hover { background: #d68910; }
+        .form-section { background: #fff; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; }
+        .table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .table th, .table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        .table th { background: #3498db; color: #fff; }
+        .message { padding: 10px 20px; border-radius: 6px; margin-bottom: 20px; }
+        .message-success { background: #d4edda; color: #155724; }
+        .message-error { background: #f8d7da; color: #721c24; }
+        #login-section { max-width: 400px; margin: 100px auto; }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; }
+        .status-IN_LOCKER { background: #d4edda; color: #155724; }
+        .status-PICKED_UP { background: #fff3cd; color: #856404; }
+        .status-SENT { background: #cce5ff; color: #004085; }
+        .locker-info { display: inline-block; background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="login-section" style="display:none;">
+            <div class="form-section">
+                <h2>Logowanie</h2>
+                <div class="form-group">
+                    <label>Login:</label>
+                    <input type="text" id="login-username" placeholder="user1, user2 lub courier">
+                </div>
+                <div class="form-group">
+                    <label>Haslo:</label>
+                    <input type="password" id="login-password" placeholder="Haslo">
+                </div>
+                <button class="btn" onclick="login()">Zaloguj</button>
+                <div id="login-error" class="message message-error" style="display:none; margin-top:10px;"></div>
+            </div>
+        </div>
+
+        <div id="app-section" style="display:none;">
+            <div class="header">
+                <h1>System Paczkomatow</h1>
+                <div class="user-info">
+                    Zalogowany: <strong id="current-user"></strong> (<span id="current-role"></span>)
+                    <button class="btn btn-danger" onclick="logout()" style="margin-left:10px;">Wyloguj</button>
+                </div>
+            </div>
+
+            <div id="message-area"></div>
+
+            <div id="send-form" class="form-section">
+                <h2 style="margin-bottom: 15px;">Nadaj paczke</h2>
+                <div class="form-group">
+                    <label>Szerokosc (cm):</label>
+                    <input type="number" id="parcel-width" min="1" placeholder="np. 15">
+                </div>
+                <div class="form-group">
+                    <label>Wysokosc (cm):</label>
+                    <input type="number" id="parcel-height" min="1" placeholder="np. 10">
+                </div>
+                <div class="form-group">
+                    <label>Glebokosc (cm):</label>
+                    <input type="number" id="parcel-depth" min="1" placeholder="np. 8">
+                </div>
+                <div class="form-group">
+                    <label>Odbiorca:</label>
+                    <input type="text" id="parcel-recipient" placeholder="Imie i nazwisko odbiorcy">
+                </div>
+                <button class="btn" onclick="sendParcel()">Nadaj paczke</button>
+            </div>
+
+            <h2 style="margin-bottom: 15px;" id="parcels-title">Moje paczki</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nadawca</th>
+                        <th>Odbiorca</th>
+                        <th>Wymiary (cm)</th>
+                        <th>Skrytka</th>
+                        <th>Status</th>
+                        <th id="actions-column" style="display:none;">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody id="parcels-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentCredentials = null;
+        let isCourier = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('login-section').style.display = 'block';
+        });
+
+        function getAuthHeader() {
+            return 'Basic ' + btoa(currentCredentials.username + ':' + currentCredentials.password);
+        }
+
+        function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            fetch('/api/parcels', {
+                headers: { 'Authorization': 'Basic ' + btoa(username + ':' + password) }
+            }).then(response => {
+                if (!response.ok) throw new Error('Bledne dane');
+                currentCredentials = { username, password };
+                isCourier = (username === 'courier');
+
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('app-section').style.display = 'block';
+                document.getElementById('current-user').textContent = username;
+                document.getElementById('current-role').textContent = isCourier ? 'Kurier' : 'Uzytkownik';
+
+                document.getElementById('send-form').style.display = isCourier ? 'none' : 'block';
+                document.getElementById('actions-column').style.display = isCourier ? '' : 'none';
+                document.getElementById('parcels-title').textContent = isCourier ? 'Wszystkie paczki' : 'Moje paczki';
+
+                loadParcels();
+            }).catch(() => {
+                document.getElementById('login-error').style.display = 'block';
+                document.getElementById('login-error').textContent = 'Bledne dane logowania';
+            });
+        }
+
+        function logout() {
+            currentCredentials = null;
+            isCourier = false;
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('app-section').style.display = 'none';
+        }
+
+        function loadParcels() {
+            const url = isCourier ? '/api/courier/parcels' : '/api/parcels';
+            fetch(url, {
+                headers: { 'Authorization': getAuthHeader() }
+            })
+            .then(r => r.json())
+            .then(parcels => {
+                const tbody = document.getElementById('parcels-body');
+                tbody.innerHTML = '';
+                parcels.forEach(function(p) {
+                    const statusLabel = { 'IN_LOCKER': 'W skrytce', 'PICKED_UP': 'Odebrana', 'SENT': 'Wyslana' };
+                    const sizeLabel = { 'SMALL': 'Mala', 'MEDIUM': 'Srednia', 'LARGE': 'Duza' };
+                    const actions = isCourier
+                        ? '<td>' +
+                          (p.status === 'IN_LOCKER'
+                            ? '<button class="btn btn-warning" onclick="courierAction(' + p.id + ',\'pickup\')">Wyciagnij</button>'
+                            : (p.status === 'PICKED_UP'
+                                ? '<button class="btn btn-success" onclick="courierAction(' + p.id + ',\'deliver\')">Zapakuj</button>'
+                                : '-')) +
+                          '</td>'
+                        : '';
+
+                    tbody.innerHTML += '<tr>' +
+                        '<td>' + p.id + '</td>' +
+                        '<td>' + p.senderUsername + '</td>' +
+                        '<td>' + p.recipientName + '</td>' +
+                        '<td>' + p.width + ' x ' + p.height + ' x ' + p.depth + '</td>' +
+                        '<td><span class="locker-info">' + (sizeLabel[p.lockerSize] || p.lockerSize) + ' (#' + p.lockerId + ')</span></td>' +
+                        '<td><span class="status-badge status-' + p.status + '">' + (statusLabel[p.status] || p.status) + '</span></td>' +
+                        actions +
+                        '</tr>';
+                });
+            });
+        }
+
+        function sendParcel() {
+            const request = {
+                width: parseInt(document.getElementById('parcel-width').value),
+                height: parseInt(document.getElementById('parcel-height').value),
+                depth: parseInt(document.getElementById('parcel-depth').value),
+                recipientName: document.getElementById('parcel-recipient').value
+            };
+
+            fetch('/api/parcels', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': getAuthHeader()
+                },
+                body: JSON.stringify(request)
+            })
+            .then(r => {
+                if (!r.ok) return r.json().then(err => { throw new Error(err.error || 'Blad nadawania'); });
+                return r.json();
+            })
+            .then(data => {
+                const sizeLabel = { 'SMALL': 'Mala', 'MEDIUM': 'Srednia', 'LARGE': 'Duza' };
+                showMessage('Paczka nadana! Przypisano skrytke: ' + (sizeLabel[data.lockerSize] || data.lockerSize) + ' (#' + data.lockerId + ')', 'success');
+                loadParcels();
+                document.getElementById('parcel-width').value = '';
+                document.getElementById('parcel-height').value = '';
+                document.getElementById('parcel-depth').value = '';
+                document.getElementById('parcel-recipient').value = '';
+            })
+            .catch(err => {
+                showMessage(err.message, 'error');
+            });
+        }
+
+        function courierAction(parcelId, action) {
+            fetch('/api/courier/parcels/' + parcelId + '/' + action, {
+                method: 'PUT',
+                headers: { 'Authorization': getAuthHeader() }
+            })
+            .then(r => {
+                if (!r.ok) return r.json().then(err => { throw new Error(err.error || 'Blad'); });
+                return r.json();
+            })
+            .then(() => {
+                const msg = action === 'pickup' ? 'Paczka wyciagnieta z paczkomatu' : 'Paczka zapakowana do paczkomatu';
+                showMessage(msg, 'success');
+                loadParcels();
+            })
+            .catch(err => {
+                showMessage(err.message, 'error');
+            });
+        }
+
+        function showMessage(text, type) {
+            const area = document.getElementById('message-area');
+            area.innerHTML = '<div class="message message-' + type + '">' + text + '</div>';
+            setTimeout(function() { area.innerHTML = ''; }, 5000);
+        }
+    </script>
+</body>
+</html>
