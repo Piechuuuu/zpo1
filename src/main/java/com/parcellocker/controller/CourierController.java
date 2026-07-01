@@ -36,10 +36,10 @@ public class CourierController {
     }
 
     @PutMapping("/parcels/{id}/deliver")
-    @Operation(summary = "Confirm parcel delivery", description = "Courier confirms delivering a parcel to locker")
+    @Operation(summary = "Confirm parcel delivery", description = "Courier confirms delivering parcel to recipient")
     public ResponseEntity<ParcelResponse> deliverParcel(@PathVariable Long id) {
         return ResponseEntity.ok(
-                parcelService.updateParcelStatus(id, ParcelStatus.IN_LOCKER)
+                parcelService.updateParcelStatus(id, ParcelStatus.DELIVERED)
         );
     }
 }

@@ -34,6 +34,7 @@
         .status-IN_LOCKER { background: #d4edda; color: #155724; }
         .status-PICKED_UP { background: #fff3cd; color: #856404; }
         .status-SENT { background: #cce5ff; color: #004085; }
+        .status-DELIVERED { background: #d1ecf1; color: #0c5460; }
         .locker-info { display: inline-block; background: #eee; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; }
     </style>
 </head>
@@ -161,15 +162,15 @@
                 const tbody = document.getElementById('parcels-body');
                 tbody.innerHTML = '';
                 parcels.forEach(function(p) {
-                    const statusLabel = { 'IN_LOCKER': 'W skrytce', 'PICKED_UP': 'Odebrana', 'SENT': 'Wyslana' };
+                    const statusLabel = { 'IN_LOCKER': 'W skrytce', 'PICKED_UP': 'Odebrana przez kuriera', 'SENT': 'Wyslana', 'DELIVERED': 'Dostarczona' };
                     const sizeLabel = { 'SMALL': 'Mala', 'MEDIUM': 'Srednia', 'LARGE': 'Duza' };
                     const actions = isCourier
                         ? '<td>' +
                           (p.status === 'IN_LOCKER'
                             ? '<button class="btn btn-warning" onclick="courierAction(' + p.id + ',\'pickup\')">Wyciagnij</button>'
                             : (p.status === 'PICKED_UP'
-                                ? '<button class="btn btn-success" onclick="courierAction(' + p.id + ',\'deliver\')">Zapakuj</button>'
-                                : '-')) +
+                                ? '<button class="btn btn-success" onclick="courierAction(' + p.id + ',\'deliver\')">Dostarcz</button>'
+                                : (p.status === 'DELIVERED' ? 'Dostarczona' : '-'))) +
                           '</td>'
                         : '';
 

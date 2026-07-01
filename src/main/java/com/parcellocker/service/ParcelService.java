@@ -69,7 +69,7 @@ public class ParcelService {
 
         parcel.setStatus(newStatus);
 
-        // Free locker when parcel is picked up
+        // Free locker when courier picks up parcel from locker
         java.util.Optional.of(newStatus)
                 .filter(ParcelStatus.PICKED_UP::equals)
                 .ifPresent(s -> parcel.getLocker().setOccupied(false));
